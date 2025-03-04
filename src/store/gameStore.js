@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { generateSpots } from "../components/Environment";
 
 const useGameStore = create((set, get) => ({
   // Game state
@@ -90,7 +91,8 @@ const useGameStore = create((set, get) => ({
   setObstacles: (obstacles) => set({ obstacles }),
 
   // Game actions
-  resetGame: () =>
+  resetGame: () => {
+    const state = get();
     set({
       battery: 100,
       score: 0,
@@ -101,7 +103,14 @@ const useGameStore = create((set, get) => ({
       waterSpots: [],
       isCharging: false,
       lowBatteryWarning: false,
-    }),
+    });
+    // Generate new spots after clearing the old ones
+    generateSpots(state.addDirtSpot, state.addWaterSpot);
+    // Reset Roomba position if the function is available
+    if (state.resetRoombaPosition) {
+      state.resetRoombaPosition();
+    }
+  },
 }));
 
 export default useGameStore;

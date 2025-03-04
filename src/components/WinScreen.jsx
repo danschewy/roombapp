@@ -30,6 +30,7 @@ export default function WinScreen() {
           borderRadius: "1rem",
           textAlign: "center",
           maxWidth: "80%",
+          color: "black",
         }}
       >
         <h1 style={{ marginBottom: "1rem" }}>Congratulations!</h1>

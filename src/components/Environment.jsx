@@ -4,6 +4,23 @@ import useGameStore from "../store/gameStore";
 import { useTexture } from "@react-three/drei";
 import * as THREE from "three";
 
+// Helper function to generate spots
+export const generateSpots = (addDirtSpot, addWaterSpot) => {
+  // Generate dirt spots
+  for (let i = 0; i < 10; i++) {
+    const x = Math.random() * 8 - 4;
+    const z = Math.random() * 8 - 4;
+    addDirtSpot({ id: `dirt-${i}`, position: [x, 0.01, z] });
+  }
+
+  // Generate water spots
+  for (let i = 0; i < 5; i++) {
+    const x = Math.random() * 8 - 4;
+    const z = Math.random() * 8 - 4;
+    addWaterSpot({ id: `water-${i}`, position: [x, 0.01, z] });
+  }
+};
+
 // Furniture and clothing models
 const TableLegs = ({ position }) => (
   <group position={position}>
@@ -101,19 +118,8 @@ export default function Environment() {
   const addWaterSpot = useGameStore((state) => state.addWaterSpot);
 
   useEffect(() => {
-    // Generate initial dirt spots
-    for (let i = 0; i < 10; i++) {
-      const x = Math.random() * 8 - 4;
-      const z = Math.random() * 8 - 4;
-      addDirtSpot({ id: `dirt-${i}`, position: [x, 0.01, z] });
-    }
-
-    // Generate initial water spots
-    for (let i = 0; i < 5; i++) {
-      const x = Math.random() * 8 - 4;
-      const z = Math.random() * 8 - 4;
-      addWaterSpot({ id: `water-${i}`, position: [x, 0.01, z] });
-    }
+    // Generate initial spots
+    generateSpots(addDirtSpot, addWaterSpot);
 
     // Generate obstacles list for collision checking
     const obstacles = [

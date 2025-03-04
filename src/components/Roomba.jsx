@@ -14,7 +14,9 @@ export default function Roomba() {
   const battery = useGameStore((state) => state.battery);
   const setBattery = useGameStore((state) => state.setBattery);
   const isMopMode = useGameStore((state) => state.isMopMode);
+  const toggleMopMode = useGameStore((state) => state.toggleMopMode);
   const cameraMode = useGameStore((state) => state.cameraMode);
+  const toggleCameraMode = useGameStore((state) => state.toggleCameraMode);
   const dirtSpots = useGameStore((state) => state.dirtSpots);
   const waterSpots = useGameStore((state) => state.waterSpots);
   const removeDirtSpot = useGameStore((state) => state.removeDirtSpot);
@@ -29,99 +31,50 @@ export default function Roomba() {
   // Movement controls
   const [subscribeKeys, getKeys] = useKeyboardControls();
 
-  // Check for collisions with dirt and water spots
-  const checkCollisions = (position, rotation, isMoving) => {
-    const radius = 0.4; // Roomba radius
-    const frontCenter = new THREE.Vector3(
-      position.x + Math.sin(rotation) * (radius * 0.7),
-      0,
-      position.z + Math.cos(rotation) * (radius * 0.7)
-    );
-    const rearCenter = new THREE.Vector3(
-      position.x - Math.sin(rotation) * (radius * 0.7),
-      0,
-      position.z - Math.cos(rotation) * (radius * 0.7)
-    );
-
-    // Only process collisions when moving
-    if (!isMoving) return;
-
-    // Add a small cooldown between collisions to prevent multiple detections
-    const now = Date.now();
-    if (now - lastCollisionTime.current < 100) return;
-
-    // Check dirt spots (front collision only, not in mop mode)
-    if (!isMopMode) {
-      for (const spot of dirtSpots) {
-        const spotPos = new THREE.Vector3(
-          spot.position[0],
-          0,
-          spot.position[2]
-        );
-        if (frontCenter.distanceTo(spotPos) < 0.3) {
-          removeDirtSpot(spot.id);
-          setScore((prev) => prev + 10);
-          lastCollisionTime.current = now;
-          break; // Only handle one dirt spot at a time
+  // Add global keyboard listeners
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      // Only handle keys if game is not over
+      if (gameStatus !== "gameOver" && gameStatus !== "win") {
+        // Toggle mop mode with space
+        if (event.code === "Space") {
+          event.preventDefault();
+          toggleMopMode();
+        }
+        // Toggle camera mode with V
+        if (event.code === "KeyV") {
+          event.preventDefault();
+          toggleCameraMode();
         }
       }
+    };
+
+    // Add the event listeners
+    window.addEventListener("keydown", handleKeyDown);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [gameStatus, toggleMopMode, toggleCameraMode]);
+
+  // Make resetPosition available to the store
+  useEffect(() => {
+    if (roombaRef.current) {
+      const resetPosition = () => {
+        const rigidBody = roombaRef.current;
+        rigidBody.setTranslation({ x: 0, y: 0.15, z: 0 });
+        rigidBody.setRotation(new THREE.Quaternion());
+        rigidBody.setLinvel({ x: 0, y: 0, z: 0 });
+        rigidBody.setAngvel({ x: 0, y: 0, z: 0 });
+        rotationAngle.current = 0;
+      };
+
+      useGameStore.setState({
+        resetRoombaPosition: resetPosition,
+      });
     }
-
-    // Check water spots
-    for (const spot of waterSpots) {
-      const spotPos = new THREE.Vector3(spot.position[0], 0, spot.position[2]);
-
-      if (isMopMode) {
-        // In mop mode, remove water when rear passes over it
-        if (rearCenter.distanceTo(spotPos) < 0.3) {
-          removeWaterSpot(spot.id);
-          setScore((prev) => prev + 15);
-          lastCollisionTime.current = now;
-          break;
-        }
-      } else {
-        // In vacuum mode, multiply water when front hits it
-        if (frontCenter.distanceTo(spotPos) < 0.3) {
-          removeWaterSpot(spot.id);
-          lastCollisionTime.current = now;
-
-          // Create 2-3 new water spots in random directions
-          const numNewSpots = Math.floor(Math.random() * 2) + 2;
-          for (let i = 0; i < numNewSpots; i++) {
-            const angle = Math.random() * Math.PI * 2;
-            const distance = 0.8 + Math.random() * 0.7;
-
-            // Calculate new position
-            const newX = spot.position[0] + Math.sin(angle) * distance;
-            const newZ = spot.position[2] + Math.cos(angle) * distance;
-
-            // Keep within room bounds (-5 to 5)
-            const boundedX = Math.max(-4.5, Math.min(4.5, newX));
-            const boundedZ = Math.max(-4.5, Math.min(4.5, newZ));
-
-            // Only create new spot if it's not too close to other water spots
-            const tooClose = waterSpots.some((existingSpot) => {
-              const existingPos = new THREE.Vector3(
-                existingSpot.position[0],
-                0,
-                existingSpot.position[2]
-              );
-              const newPos = new THREE.Vector3(boundedX, 0, boundedZ);
-              return existingPos.distanceTo(newPos) < 0.5;
-            });
-
-            if (!tooClose) {
-              addWaterSpot({
-                id: `water-${spot.id}-${i}-${Date.now()}`,
-                position: [boundedX, spot.position[1], boundedZ],
-              });
-            }
-          }
-          break; // Only handle one water spot at a time
-        }
-      }
-    }
-  };
+  }, []);
 
   // Check if Roomba is at charging station
   const checkCharging = (position) => {
@@ -138,6 +91,137 @@ export default function Roomba() {
     }
 
     return isAtCharger;
+  };
+
+  // Check for collisions with dirt and water spots
+  const checkCollisions = (position, rotation, isMoving) => {
+    // Only process collisions when moving
+    if (!isMoving) return;
+
+    // Add a small cooldown between collisions to prevent multiple detections
+    const now = Date.now();
+    if (now - lastCollisionTime.current < 100) return;
+
+    const radius = 0.4; // Roomba radius
+    const frontCenter = new THREE.Vector3(
+      position.x + Math.sin(rotation) * (radius * 0.7),
+      0,
+      position.z + Math.cos(rotation) * (radius * 0.7)
+    );
+    const rearCenter = new THREE.Vector3(
+      position.x - Math.sin(rotation) * (radius * 0.7),
+      0,
+      position.z - Math.cos(rotation) * (radius * 0.7)
+    );
+
+    // Check dirt spots (front collision only, not in mop mode)
+    if (!isMopMode) {
+      let closestDirt = null;
+      let closestDirtDistance = Infinity;
+
+      for (const spot of dirtSpots) {
+        const spotPos = new THREE.Vector3(
+          spot.position[0],
+          0,
+          spot.position[2]
+        );
+        const distance = frontCenter.distanceTo(spotPos);
+
+        if (distance < 0.3 && distance < closestDirtDistance) {
+          closestDirt = spot;
+          closestDirtDistance = distance;
+        }
+      }
+
+      if (closestDirt) {
+        removeDirtSpot(closestDirt.id);
+        setScore((prev) => prev + 10);
+        lastCollisionTime.current = now;
+      }
+    }
+
+    // Check water spots
+    if (isMopMode) {
+      // In mop mode, remove water when rear passes over it
+      let closestWater = null;
+      let closestWaterDistance = Infinity;
+
+      for (const spot of waterSpots) {
+        const spotPos = new THREE.Vector3(
+          spot.position[0],
+          0,
+          spot.position[2]
+        );
+        const distance = rearCenter.distanceTo(spotPos);
+
+        if (distance < 0.3 && distance < closestWaterDistance) {
+          closestWater = spot;
+          closestWaterDistance = distance;
+        }
+      }
+
+      if (closestWater) {
+        removeWaterSpot(closestWater.id);
+        setScore((prev) => prev + 15);
+        lastCollisionTime.current = now;
+      }
+    } else {
+      // In vacuum mode, multiply water when front hits it
+      let closestWater = null;
+      let closestWaterDistance = Infinity;
+
+      for (const spot of waterSpots) {
+        const spotPos = new THREE.Vector3(
+          spot.position[0],
+          0,
+          spot.position[2]
+        );
+        const distance = frontCenter.distanceTo(spotPos);
+
+        if (distance < 0.3 && distance < closestWaterDistance) {
+          closestWater = spot;
+          closestWaterDistance = distance;
+        }
+      }
+
+      if (closestWater) {
+        removeWaterSpot(closestWater.id);
+        lastCollisionTime.current = now;
+
+        // Create 2-3 new water spots in random directions
+        const numNewSpots = Math.floor(Math.random() * 2) + 2;
+        for (let i = 0; i < numNewSpots; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          const distance = 0.8 + Math.random() * 0.7;
+
+          // Calculate new position
+          const newX = closestWater.position[0] + Math.sin(angle) * distance;
+          const newZ = closestWater.position[2] + Math.cos(angle) * distance;
+
+          // Keep within room bounds (-5 to 5)
+          const boundedX = Math.max(-4.5, Math.min(4.5, newX));
+          const boundedZ = Math.max(-4.5, Math.min(4.5, newZ));
+
+          // Only create new spot if it's not too close to other water spots
+          const tooClose = waterSpots.some((existingSpot) => {
+            const existingPos = new THREE.Vector3(
+              existingSpot.position[0],
+              0,
+              existingSpot.position[2]
+            );
+            const newPos = new THREE.Vector3(boundedX, 0, boundedZ);
+            return existingPos.distanceTo(newPos) < 0.5;
+          });
+
+          if (!tooClose) {
+            addWaterSpot({
+              id: `water-${closestWater.id}-${i}-${Date.now()}`,
+              position: [boundedX, closestWater.position[1], boundedZ],
+            });
+          }
+        }
+      }
+    }
   };
 
   useFrame((state, delta) => {
