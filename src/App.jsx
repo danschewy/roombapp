@@ -12,7 +12,8 @@ import Roomba from "./components/Roomba";
 import Environment from "./components/Environment";
 import DirtSpot from "./components/DirtSpot";
 import WaterSpot from "./components/WaterSpot";
-import GameUI from "./components/GameUI";
+import Interface from "./components/Interface";
+import WinScreen from "./components/WinScreen";
 
 // Define keyboard controls
 const keyboardMap = [
@@ -72,11 +73,14 @@ function Game() {
 
 export default function App() {
   return (
-    <KeyboardControls map={keyboardMap}>
-      <div style={{ width: "100vw", height: "100vh" }}>
-        <Game />
-        <GameUI />
-      </div>
-    </KeyboardControls>
+    <>
+      <WinScreen />
+      <Interface />
+      <KeyboardControls map={keyboardMap}>
+        <div style={{ width: "100vw", height: "100vh" }}>
+          <Game />
+        </div>
+      </KeyboardControls>
+    </>
   );
 }
