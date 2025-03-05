@@ -71,6 +71,11 @@ Want to make the game your own? You can:
 - Modify cleaning mechanics
 - Adjust difficulty settings
 
+## 📸 Screenshots 
+<img width="1439" alt="image" src="https://github.com/user-attachments/assets/2de281ac-af87-460a-b9d7-895f83716562" />
+<img width="1439" alt="image" src="https://github.com/user-attachments/assets/adad64b6-6d1e-4cba-ac89-8e5269963021" />
+
+
 ## 🤝 Contributing
 
 Found a bug? Have an awesome idea? We'd love your help! Feel free to:
