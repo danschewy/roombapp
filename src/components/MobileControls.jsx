@@ -42,7 +42,6 @@ export default function MobileControls() {
       code: KEYS[direction],
       bubbles: true,
     });
-    console.log(event);
     document.dispatchEvent(event);
   };
 
