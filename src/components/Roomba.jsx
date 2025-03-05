@@ -1,4 +1,4 @@
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useCallback } from "react";
 import { useFrame } from "@react-three/fiber";
 import { useKeyboardControls, PerspectiveCamera } from "@react-three/drei";
 import { RigidBody, useRapier } from "@react-three/rapier";
@@ -27,9 +27,145 @@ export default function Roomba() {
   const setIsCharging = useGameStore((state) => state.setIsCharging);
   const isCharging = useGameStore((state) => state.isCharging);
   const lowBatteryWarning = useGameStore((state) => state.lowBatteryWarning);
+  const setMovementControls = useGameStore(
+    (state) => state.setMovementControls
+  );
 
   // Movement controls
   const [subscribeKeys, getKeys] = useKeyboardControls();
+
+  // Define movement functions
+  const moveForward = useCallback(() => {
+    if (!roombaRef.current || gameStatus === "gameOver" || gameStatus === "win")
+      return;
+    if (battery <= 0 && !isCharging) return;
+
+    const rigidBody = roombaRef.current;
+    const speed = 5;
+    const moveDirection = new THREE.Vector3(0, 0, 1);
+    moveDirection.applyQuaternion(
+      new THREE.Quaternion().setFromAxisAngle(
+        new THREE.Vector3(0, 1, 0),
+        rotationAngle.current
+      )
+    );
+
+    const velocity = {
+      x: moveDirection.x * speed,
+      y: 0,
+      z: moveDirection.z * speed,
+    };
+
+    rigidBody.setLinvel(velocity);
+    if (!isCharging) {
+      setBattery(Math.max(0, battery - 0.02));
+    }
+
+    const position = rigidBody.translation();
+    checkCollisions(position, rotationAngle.current, true);
+  }, [battery, isCharging, gameStatus, setBattery]);
+
+  const moveBackward = useCallback(() => {
+    if (!roombaRef.current || gameStatus === "gameOver" || gameStatus === "win")
+      return;
+    if (battery <= 0 && !isCharging) return;
+
+    const rigidBody = roombaRef.current;
+    const speed = 5;
+    const moveDirection = new THREE.Vector3(0, 0, -1);
+    moveDirection.applyQuaternion(
+      new THREE.Quaternion().setFromAxisAngle(
+        new THREE.Vector3(0, 1, 0),
+        rotationAngle.current
+      )
+    );
+
+    const velocity = {
+      x: moveDirection.x * speed,
+      y: 0,
+      z: moveDirection.z * speed,
+    };
+
+    rigidBody.setLinvel(velocity);
+    if (!isCharging) {
+      setBattery(Math.max(0, battery - 0.02));
+    }
+
+    const position = rigidBody.translation();
+    checkCollisions(position, rotationAngle.current, true);
+  }, [battery, isCharging, gameStatus, setBattery]);
+
+  const turnLeft = useCallback(() => {
+    if (!roombaRef.current || gameStatus === "gameOver" || gameStatus === "win")
+      return;
+    if (battery <= 0 && !isCharging) return;
+
+    const rigidBody = roombaRef.current;
+    const rotationSpeed = 2;
+    rotationAngle.current += rotationSpeed * 0.05;
+    const quaternion = new THREE.Quaternion();
+    quaternion.setFromAxisAngle(
+      new THREE.Vector3(0, 1, 0),
+      rotationAngle.current
+    );
+    rigidBody.setRotation(quaternion);
+    if (!isCharging) {
+      setBattery(Math.max(0, battery - 0.01));
+    }
+  }, [battery, isCharging, gameStatus, setBattery]);
+
+  const turnRight = useCallback(() => {
+    if (!roombaRef.current || gameStatus === "gameOver" || gameStatus === "win")
+      return;
+    if (battery <= 0 && !isCharging) return;
+
+    const rigidBody = roombaRef.current;
+    const rotationSpeed = 2;
+    rotationAngle.current -= rotationSpeed * 0.05;
+    const quaternion = new THREE.Quaternion();
+    quaternion.setFromAxisAngle(
+      new THREE.Vector3(0, 1, 0),
+      rotationAngle.current
+    );
+    rigidBody.setRotation(quaternion);
+    if (!isCharging) {
+      setBattery(Math.max(0, battery - 0.01));
+    }
+  }, [battery, isCharging, gameStatus, setBattery]);
+
+  // Stop movement function
+  const stopMovement = useCallback(() => {
+    if (!roombaRef.current) return;
+    const rigidBody = roombaRef.current;
+    rigidBody.setLinvel({ x: 0, y: 0, z: 0 });
+  }, []);
+
+  // Connect movement functions to store
+  useEffect(() => {
+    setMovementControls({
+      moveForward,
+      moveBackward,
+      turnLeft,
+      turnRight,
+      stopMovement,
+      resetRoombaPosition: () => {
+        if (roombaRef.current) {
+          roombaRef.current.setTranslation({ x: 0, y: 0.15, z: 0 });
+          roombaRef.current.setRotation(new THREE.Quaternion());
+          roombaRef.current.setLinvel({ x: 0, y: 0, z: 0 });
+          roombaRef.current.setAngvel({ x: 0, y: 0, z: 0 });
+          rotationAngle.current = 0;
+        }
+      },
+    });
+  }, [
+    moveForward,
+    moveBackward,
+    turnLeft,
+    turnRight,
+    stopMovement,
+    setMovementControls,
+  ]);
 
   // Add global keyboard listeners
   useEffect(() => {
@@ -224,6 +360,7 @@ export default function Roomba() {
     }
   };
 
+  // Handle keyboard controls in useFrame
   useFrame((state, delta) => {
     if (!roombaRef.current || gameStatus === "gameOver" || gameStatus === "win")
       return;
@@ -236,55 +373,26 @@ export default function Roomba() {
 
     // Charge battery when at charging station
     if (isAtCharger) {
-      setBattery(Math.min(100, battery + delta * 20)); // Charge 20% per second
+      setBattery(Math.min(100, battery + delta * 20));
     }
 
     // Only allow movement if not game over and either has battery or is charging
     if (battery > 0 || isCharging) {
       const { forward, backward, left, right } = getKeys();
-      const speed = 5;
-      const rotationSpeed = 2;
 
-      // Handle rotation in place
-      if (left || right) {
-        rotationAngle.current += (left ? 1 : -1) * rotationSpeed * delta;
-        const quaternion = new THREE.Quaternion();
-        quaternion.setFromAxisAngle(
-          new THREE.Vector3(0, 1, 0),
-          rotationAngle.current
-        );
-        rigidBody.setRotation(quaternion);
-        if (!isCharging) {
-          setBattery(Math.max(0, battery - delta));
-        }
+      if (forward) {
+        moveForward();
+      } else if (backward) {
+        moveBackward();
+      } else {
+        stopMovement();
       }
 
-      // Handle forward/backward movement
-      if (forward || backward) {
-        const direction = forward ? 1 : -1;
-        const moveDirection = new THREE.Vector3(0, 0, direction);
-        moveDirection.applyQuaternion(
-          new THREE.Quaternion().setFromAxisAngle(
-            new THREE.Vector3(0, 1, 0),
-            rotationAngle.current
-          )
-        );
-
-        const velocity = {
-          x: moveDirection.x * speed,
-          y: 0,
-          z: moveDirection.z * speed,
-        };
-
-        rigidBody.setLinvel(velocity);
-        if (!isCharging) {
-          setBattery(Math.max(0, battery - delta * 2));
-        }
-
-        // Check for collisions while moving
-        checkCollisions(position, rotationAngle.current, true);
-      } else {
-        rigidBody.setLinvel({ x: 0, y: 0, z: 0 });
+      if (left) {
+        turnLeft();
+      }
+      if (right) {
+        turnRight();
       }
 
       rigidBody.resetTorques(true);

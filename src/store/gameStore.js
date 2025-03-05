@@ -12,6 +12,23 @@ const useGameStore = create((set, get) => ({
   isCharging: false,
   lowBatteryWarning: false,
 
+  // Movement functions
+  moveForward: null,
+  moveBackward: null,
+  turnLeft: null,
+  turnRight: null,
+  resetRoombaPosition: null,
+
+  // Function to set movement controls
+  setMovementControls: (controls) =>
+    set({
+      moveForward: controls.moveForward,
+      moveBackward: controls.moveBackward,
+      turnLeft: controls.turnLeft,
+      turnRight: controls.turnRight,
+      resetRoombaPosition: controls.resetRoombaPosition,
+    }),
+
   // Dirt and water spots
   dirtSpots: [],
   waterSpots: [],

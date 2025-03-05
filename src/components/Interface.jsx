@@ -1,12 +1,11 @@
 import React from "react";
 import useGameStore from "../store/gameStore";
+import MobileControls from "./MobileControls";
 
 export default function Interface() {
   const battery = useGameStore((state) => state.battery);
   const score = useGameStore((state) => state.score);
   const isMopMode = useGameStore((state) => state.isMopMode);
-  const currentRound = useGameStore((state) => state.currentRound);
-  const totalRounds = useGameStore((state) => state.totalRounds);
   const isCharging = useGameStore((state) => state.isCharging);
   const gameStatus = useGameStore((state) => state.gameStatus);
   const toggleMopMode = useGameStore((state) => state.toggleMopMode);
@@ -151,6 +150,9 @@ export default function Interface() {
           New Game
         </button>
       </div>
+
+      {/* Mobile Controls */}
+      <MobileControls />
 
       {/* Game Over Overlay */}
       {gameStatus === "gameOver" && (
